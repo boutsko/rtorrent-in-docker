@@ -1,0 +1,17 @@
+#shell "/bin/zsh"
+
+term xterm-xfree86
+
+screen -t RTORRENT
+select 0
+stuff "rtorrent"
+
+screen -t EMACS
+select 1
+stuff "emacs -nw ."
+
+hardstatus string '%{= kG}[ %{G}%H %{g}][%= %{= kw}%?%-Lw%?%{r}(%{W}%n*%f%t%?(%u)%?%{r})%{w}%?%+Lw%?%?%= %{g}][%{B} %d/%m %{W}%c %{g}]'
+
+hardstatus alwayslastline
+
+# shelltitle "$ |zsh"

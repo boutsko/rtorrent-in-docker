@@ -1,0 +1,10 @@
+version: "3.2"
+services:
+  rtorrent:
+    build:
+      context: .
+    volumes:
+      - ./mvol:/rtorrent
+
+    # stdin_open: true
+    # tty: true
