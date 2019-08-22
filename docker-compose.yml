@@ -5,6 +5,3 @@ services:
       context: .
     volumes:
       - ./mvol:/rtorrent
-
-    # stdin_open: true
-    # tty: true
