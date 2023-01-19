@@ -1,103 +1,122 @@
-# This is an example resource file for rTorrent. Copy to
-# ~/.rtorrent.rc and enable/modify the options as needed. Remember to
-# uncomment the options you wish to enable.
-
-# Maximum and minimum number of peers to connect to per torrent.
-min_peers = 40
-max_peers = 100
-
-# Same as above but for seeding completed torrents (-1 = same as downloading)
-min_peers_seed = 10
-max_peers_seed = 50
-
-# Maximum number of simultanious uploads per torrent.
-max_uploads = 15
-
-# Global upload and download rate in KiB. "0" for unlimited.
-# download_rate = 350
-# upload_rate = 50 
-download_rate = 0
-upload_rate = 0
-
-# Default directory to save the downloaded torrents.
-directory = /rtorrent/inbox/
-
-# Default session directory. Make sure you don't run multiple instance
-# of rtorrent using the same session directory. Perhaps using a
-# relative path?
-session = ./session
-
-# Watch a directory for new torrents, and stop those that have been
-# deleted.
-schedule = watch_directory,5,5,load_start=./watch/*.torrent
-schedule = untied_directory,5,5,stop_untied=
-
-# Close torrents when diskspace is low.
-schedule = low_diskspace,5,60,close_low_diskspace=100M
-
-# Stop torrents when reaching upload ratio in percent,
-# when also reaching total upload in bytes, or when
-# reaching final upload ratio in percent.
-# example: stop at ratio 2.0 with at least 200 MB uploaded, or else ratio 20.0
-#schedule = ratio,60,60,"stop_on_ratio=200,200M,2000"
-
-# The ip address reported to the tracker.
-#ip = 127.0.0.1
-#ip = rakshasa.no
-
-# The ip address the listening socket and outgoing connections is
-# bound to.
-#bind = 127.0.0.1
-#bind = rakshasa.no
-
-# Port range to use for listening.
-#port_range = 6890-6999
-port_range = 49165-49165
-
-# Start opening ports at a random position within the port range.
-port_random = no
-
-#on_finished = move_complete,"execute=mv,-u,$d.get_base_path=,/rtorrent/;d.set_directory=~/rtr-comleted/"
-
-
-# Check hash for finished torrents. Might be usefull until the bug is
-# fixed that causes lack of diskspace not to be properly reported.
-#check_hash = no
-
-# Set whetever the client should try to connect to UDP trackers.
-use_udp_trackers = yes
-
-# Alternative calls to bind and ip that should handle dynamic ip's.
-#schedule = ip_tick,0,1800,ip=rakshasa
-#schedule = bind_tick,0,1800,bind=rakshasa
-
-# Encryption options, set to none (default) or any combination of the following:
-# allow_incoming, try_outgoing, require, require_RC4, enable_retry, prefer_plaintext
+#############################################################################
+# A minimal rTorrent configuration that provides the basic features
+# you want to have in addition to the built-in defaults.
 #
-# The example value allows incoming encrypted connections, starts unencrypted
-# outgoing connections but retries with encryption if they fail, preferring
-# plaintext to RC4 encryption after the encrypted handshake
-#
-# encryption = allow_incoming,enable_retry,prefer_plaintext
+# See https://github.com/rakshasa/rtorrent/wiki/CONFIG-Template
+# for an up-to-date version.
+#############################################################################
 
-# Enable peer exchange (for torrents not marked private)
-#
-#peer_exchange = yes
 
-#
-# Do not modify the following parameters unless you know what you're doing.
-#
+## Instance layout (base paths)
+method.insert = cfg.basedir,  private|const|string, (cat,"/rtorrent")
+method.insert = cfg.download, private|const|string, (cat,(cfg.basedir),"download/")
+method.insert = cfg.logs,     private|const|string, (cat,(cfg.basedir),"log/")
+method.insert = cfg.logfile,  private|const|string, (cat,(cfg.logs),"rtorrent-",(system.time),".log")
+method.insert = cfg.session,  private|const|string, (cat,(cfg.basedir),".session/")
+method.insert = cfg.watch,    private|const|string, (cat,(cfg.basedir),"watch/")
 
-# Hash read-ahead controls how many MB to request the kernel to read
-# ahead. If the value is too low the disk may not be fully utilized,
-# while if too high the kernel might not be able to keep the read
-# pages in memory thus end up trashing.
-#hash_read_ahead = 10
 
-# Interval between attempts to check the hash, in milliseconds.
-#hash_interval = 100
+## Create instance directories
+execute.throw = sh, -c, (cat,\
+    "mkdir -p \"",(cfg.download),"\" ",\
+    "\"",(cfg.logs),"\" ",\
+    "\"",(cfg.session),"\" ",\
+    "\"",(cfg.watch),"/load\" ",\
+    "\"",(cfg.watch),"/start\" ")
 
-# Number of attempts to check the hash while using the mincore status,
-# before forcing. Overworked systems might need lower values to get a
-# decent hash checking rate.
-#hash_max_tries = 10
+
+## Listening port for incoming peer traffic (fixed; you can also randomize it)
+network.port_range.set = 50000-50000
+network.port_random.set = no
+
+
+## Tracker-less torrent and UDP tracker support
+## (conservative settings for 'private' trackers, change for 'public')
+dht.mode.set = auto
+protocol.pex.set = yes
+
+trackers.use_udp.set = yes
+
+
+## Peer settings
+throttle.max_uploads.set = 100
+throttle.max_uploads.global.set = 250
+
+throttle.min_peers.normal.set = 20
+throttle.max_peers.normal.set = 60
+throttle.min_peers.seed.set = 30
+throttle.max_peers.seed.set = 80
+trackers.numwant.set = 80
+
+protocol.encryption.set = allow_incoming,try_outgoing,enable_retry
+
+
+## Limits for file handle resources, this is optimized for
+## an `ulimit` of 1024 (a common default). You MUST leave
+## a ceiling of handles reserved for rTorrent's internal needs!
+network.http.max_open.set = 50
+network.max_open_files.set = 600
+network.max_open_sockets.set = 300
+
+
+## Memory resource usage (increase if you have a large number of items loaded,
+## and/or the available resources to spend)
+pieces.memory.max.set = 1800M
+network.xmlrpc.size_limit.set = 4M
+
+
+## Basic operational settings (no need to change these)
+session.path.set = (cat, (cfg.session))
+directory.default.set = (cat, (cfg.download))
+log.execute = (cat, (cfg.logs), "execute.log")
+#log.xmlrpc = (cat, (cfg.logs), "xmlrpc.log")
+execute.nothrow = sh, -c, (cat, "echo >",\
+    (session.path), "rtorrent.pid", " ",(system.pid))
+
+
+## Other operational settings (check & adapt)
+encoding.add = utf8
+system.umask.set = 0027
+system.cwd.set = (directory.default)
+network.http.dns_cache_timeout.set = 25
+schedule2 = monitor_diskspace, 15, 60, ((close_low_diskspace, 1000M))
+#pieces.hash.on_completion.set = no
+#view.sort_current = seeding, greater=d.ratio=
+#keys.layout.set = qwerty
+#network.http.capath.set = "/etc/ssl/certs"
+#network.http.ssl_verify_peer.set = 0
+#network.http.ssl_verify_host.set = 0
+
+
+## Some additional values and commands
+method.insert = system.startup_time, value|const, (system.time)
+method.insert = d.data_path, simple,\
+    "if=(d.is_multi_file),\
+        (cat, (d.directory), /),\
+        (cat, (d.directory), /, (d.name))"
+method.insert = d.session_file, simple, "cat=(session.path), (d.hash), .torrent"
+
+
+## Watch directories (add more as you like, but use unique schedule names)
+## Add torrent
+schedule2 = watch_oad, 11, 10, ((load.verbose, (cat, (cfg.watch), "load/*.torrent")))
+## Add & download straight away
+schedule2 = watch_start, 10, 10, ((load.start_verbose, (cat, (cfg.watch), "start/*.torrent")))
+
+
+## Run the rTorrent process as a daemon in the background
+## (and control via XMLRPC sockets)
+#system.daemon.set = true
+#network.scgi.open_local = (cat,(session.path),rpc.socket)
+#execute.nothrow = chmod,770,(cat,(session.path),rpc.socket)
+
+
+## Logging:
+##   Levels = critical error warn notice info debug
+##   Groups = connection_* dht_* peer_* rpc_* storage_* thread_* tracker_* torrent_*
+print = (cat, "Logging to ", (cfg.logfile))
+log.open_file = "log", (cfg.logfile)
+log.add_output = "info", "log"
+#log.add_output = "tracker_debug", "log"
+
+### END of rtorrent.rc ###
